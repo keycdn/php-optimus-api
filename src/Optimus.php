@@ -7,8 +7,18 @@
 * @author KeyCDN
 * @version 0.1
 */
+namespace KeyCDN\Optimus;
+
+use KeyCDN\Optimus\Exception\ClientException;
+use KeyCDN\Optimus\Exception\NotFoundException;
+use KeyCDN\Optimus\Exception\ServerException;
+use KeyCDN\Optimus\Exception\TooManyRequestsException;
 
 class Optimus {
+
+    const OPTION_OPTIMIZE = 'optimize';
+    const OPTION_CLEAN = 'clean';
+    const OPTION_WEB_P = 'webp';
 
     /**
     * @var string
@@ -65,11 +75,15 @@ class Optimus {
     }
 
     /**
-    * @param string $image
-    * @param string|null
-    * @return string
-    * @throws Exception
-    */
+     * @param string $image
+     * @param string|null $option
+     * @return bool|string
+     * @throws ClientException
+     * @throws NotFoundException
+     * @throws ServerException
+     * @throws TooManyRequestsException
+     * @throws \Exception
+     */
     public function optimize($image, $option = null) {
 
         // optimize: image optimization in the same format
@@ -99,12 +113,35 @@ class Optimus {
         $response = curl_exec($ch);
         $curlError = curl_error($ch);
 
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if ($httpCode >= 400 && $httpCode <= 499) {
+            // HTTP client errors
+            switch ($httpCode) {
+                case 404:
+                    throw new NotFoundException(
+                        "Optimus Client-Error: invalid API key or wrong API endpoint "
+                        . "[Status {$httpCode}]");
+                    break;
+                case 429:
+                    throw new TooManyRequestsException(
+                        "Optimus Client-Error: API requests are rate limited at 3 requests per seconds "
+                        . "[Status {$httpCode}]");
+                    break;
+                default:
+                    throw new ClientException("Optimus Client-Error: [Status {$httpCode}]");
+            }
+        } elseif ($httpCode >= 500 && $httpCode <= 599) {
+            // HTTP server errors
+            throw new ServerException("Optimus Server-Error: [Status {$httpCode}]");
+        }
+
         $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $body = substr($response, $header_size);
 
         // error catching
         if (!empty($curlError) || empty($body)) {
-            throw new Exception("Optimus-Error: {$curlError}, Output: {$body}");
+            throw new \Exception("Optimus-Error: {$curlError}, Output: {$body}");
         }
 
         return $body;

@@ -9,10 +9,10 @@
  */
 
  // load optimus lib
-require 'src/optimus.php';
+require '../vendor/autoload.php';
 
 // create object and pass API license key
-$optimus = new Optimus('<your_license_key>');
+$optimus = new KeyCDN\Optimus\Optimus('<your_license_key>');
 
 // optimize image
 $result = $optimus->optimize('img/102kb.jpg');
